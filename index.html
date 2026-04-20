@@ -72,10 +72,12 @@
 
     /* Bottom Info */
     .bottom-info {
-      position:absolute; bottom:80px; left:16px; right:76px; z-index:15;
-      background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
-      padding: 48px 0 0 0;
+      position:absolute; bottom:0; left:0; right:70px; z-index:15;
+      padding: 60px 16px 90px 16px;
+      background: linear-gradient(to top, rgba(0,0,0,0.72) 60%, transparent 100%);
+      pointer-events:none;
     }
+    .bottom-info > * { pointer-events:auto; }
     .user-info {
       display:flex; align-items:center; gap:10px; margin-bottom:8px;
     }
@@ -121,7 +123,7 @@
 
     /* Right Actions */
     .right-actions {
-      position:absolute; right:12px; bottom:100px;
+      position:absolute; right:12px; bottom:88px;
       display:flex; flex-direction:column; gap:20px; z-index:20;
     }
     .action-btn {
@@ -263,8 +265,12 @@ function fmtNum(n) {
 }
 
 function getShareUrl(v) {
-  if (v.string_post_id) return `https://hopenity.com/post/${v.string_post_id}`;
-  if (v.post_id)        return `https://hopenity.com/post/${v.post_id}`;
+  // সব possible field নাম check করা
+  const sid = v.string_post_id || v.stringPostId || v.string_id || '';
+  const pid = v.post_id || v.postId || v.id || '';
+  if (sid) return `https://hopenity.com/post/${sid}`;
+  if (pid) return `https://hopenity.com/post/${pid}`;
+  console.warn('Share: কোনো post ID পাওয়া যায়নি', v);
   return 'https://hopenity.com';
 }
 
@@ -469,9 +475,12 @@ function renderVideos(videos) {
     });
 
     // ---- Share button ----
+    const _vdata = vdata; // closure নিশ্চিত করতে
     reel.querySelector('.share-btn').addEventListener('click', e => {
       e.stopPropagation();
-      copyLink(getShareUrl(vdata));
+      const url = getShareUrl(_vdata);
+      console.log('Share URL:', url, '| string_post_id:', _vdata.string_post_id, '| post_id:', _vdata.post_id);
+      copyLink(url);
     });
 
     // ---- Like animation ----
