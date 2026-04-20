@@ -8,155 +8,446 @@
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
-      background:#000; color:white; font-family:system-ui, sans-serif;
+      background:#000; color:white;
+      font-family: system-ui, sans-serif;
       height:100vh; overflow:hidden;
     }
     .container {
-      height:100vh; overflow-y:scroll; scroll-snap-type:y mandatory;
+      height:100vh; overflow-y:scroll;
+      scroll-snap-type:y mandatory;
       -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
     }
+    .container::-webkit-scrollbar { display:none; }
+
     .reel {
-      height:100vh; scroll-snap-align:start; position:relative;
-      display:flex; align-items:center; justify-content:center; background:#111;
+      height:100vh; scroll-snap-align:start; scroll-snap-stop:always;
+      position:relative; display:flex;
+      align-items:center; justify-content:center; background:#111;
+      overflow:hidden;
     }
     .video-wrapper {
       position:relative; width:100%; height:100%; max-width:425px; background:#000;
     }
     video {
-      width:100%; height:100%; object-fit:cover;
+      width:100%; height:100%; object-fit:cover; display:block; cursor:pointer;
     }
-    .overlay {
-      position:absolute; bottom:0; left:0; right:0; padding:25px 20px 90px;
-      background:linear-gradient(transparent, rgba(0,0,0,0.92)); z-index:10;
+
+    /* Tap overlay - receives click for pause/play */
+    .tap-area {
+      position:absolute; inset:0; z-index:10; cursor:pointer;
+    }
+
+    /* Pause/Play icon in center */
+    .play-pause-icon {
+      position:absolute; top:50%; left:50%;
+      transform: translate(-50%, -50%) scale(0);
+      width:72px; height:72px; border-radius:50%;
+      background:rgba(0,0,0,0.55);
+      display:flex; align-items:center; justify-content:center;
+      z-index:20; pointer-events:none;
+      transition: transform 0.18s cubic-bezier(.34,1.56,.64,1), opacity 0.25s;
+      opacity:0;
+    }
+    .play-pause-icon svg { width:34px; height:34px; fill:white; }
+    .play-pause-icon.pop {
+      transform: translate(-50%, -50%) scale(1);
+      opacity:1;
+    }
+    .play-pause-icon.fade-out {
+      transform: translate(-50%, -50%) scale(1.25);
+      opacity:0;
+    }
+
+    /* Progress bar */
+    .progress-bar {
+      position:absolute; bottom:0; left:0; right:0;
+      height:3px; background:rgba(255,255,255,0.2); z-index:25;
+    }
+    .progress-fill {
+      height:100%; width:0%;
+      background:#ff2d55;
+      transition: width 0.1s linear;
+    }
+
+    /* Bottom Info */
+    .bottom-info {
+      position:absolute; bottom:80px; left:16px; right:76px; z-index:15;
+      background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
+      padding: 48px 0 0 0;
     }
     .user-info {
-      display:flex; align-items:center; gap:12px; margin-bottom:12px;
+      display:flex; align-items:center; gap:10px; margin-bottom:8px;
     }
     .user-info img {
-      width:48px; height:48px; border-radius:50%; border:2px solid #fff; object-fit:cover;
+      width:42px; height:42px; border-radius:50%;
+      border:2px solid white; object-fit:cover; flex-shrink:0;
+      background:#333;
     }
-    .username { font-size:1.15rem; font-weight:600; }
-    .verified { color:#00d4ff; font-size:1.3rem; margin-left:4px; }
-    .title { font-size:1.32rem; font-weight:600; line-height:1.35; margin-bottom:15px; }
-    .stats { display:flex; gap:20px; font-size:1rem; margin-bottom:12px; }
+    .username { font-size:1rem; font-weight:700; }
+    .verified {
+      display:inline-flex; align-items:center;
+      margin-left:4px; vertical-align:middle;
+    }
+    .verified svg { width:14px; height:14px; fill:#4fc3f7; }
+    .caption {
+      font-size:0.92rem; line-height:1.45;
+      display:-webkit-box; -webkit-line-clamp:2;
+      -webkit-box-orient:vertical; overflow:hidden;
+      text-shadow:0 1px 6px rgba(0,0,0,0.8);
+      margin-bottom:8px;
+    }
+    .music-row {
+      display:flex; align-items:center; gap:6px;
+      font-size:0.78rem; color:rgba(255,255,255,0.65);
+      overflow:hidden;
+    }
+    .music-row svg { width:12px; height:12px; fill:rgba(255,255,255,0.65); flex-shrink:0; }
+    .music-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-    .sound-btn {
-      position: absolute;
-      bottom: 100px;
-      right: 20px;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      border: none;
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      font-size: 24px;
-      z-index: 20;
-      cursor: pointer;
+    /* Right Actions */
+    .right-actions {
+      position:absolute; right:12px; bottom:100px;
+      display:flex; flex-direction:column; gap:20px; z-index:20;
     }
+    .action-btn {
+      display:flex; flex-direction:column; align-items:center; gap:4px;
+      cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent;
+    }
+    .action-circle {
+      width:46px; height:46px; border-radius:50%;
+      background:rgba(255,255,255,0.12);
+      backdrop-filter:blur(8px);
+      border:0.5px solid rgba(255,255,255,0.2);
+      display:flex; align-items:center; justify-content:center;
+      transition: transform 0.15s, background 0.2s;
+    }
+    .action-btn:active .action-circle { transform:scale(0.86); }
+    .action-circle svg { width:22px; height:22px; fill:white; }
+    .action-label { font-size:0.75rem; font-weight:500; color:rgba(255,255,255,0.85); }
+
+    /* Share button accent */
+    .share-btn .action-circle {
+      background:rgba(255,45,85,0.18);
+      border-color:rgba(255,45,85,0.4);
+    }
+    .share-btn .action-circle svg { fill:#ff2d55; }
+
+    /* Mute button */
+    .mute-btn {
+      position:absolute; right:16px; top:56px; z-index:25;
+      width:36px; height:36px; border-radius:50%;
+      background:rgba(0,0,0,0.5);
+      border:0.5px solid rgba(255,255,255,0.2);
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer;
+    }
+    .mute-btn svg { width:18px; height:18px; fill:white; }
+
+    /* Toast */
+    #toast {
+      position:fixed; bottom:96px; left:50%;
+      transform:translateX(-50%) translateY(16px);
+      background:rgba(20,20,20,0.92);
+      color:white; padding:10px 22px;
+      border-radius:24px; font-size:0.82rem;
+      z-index:100; opacity:0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events:none;
+      border:0.5px solid rgba(255,255,255,0.15);
+      white-space:nowrap;
+    }
+    #toast.show {
+      opacity:1; transform:translateX(-50%) translateY(0);
+    }
+
+    /* Loading spinner */
+    .loading-overlay {
+      position:absolute; inset:0; background:#111;
+      display:flex; align-items:center; justify-content:center; z-index:5;
+    }
+    .spinner {
+      width:38px; height:38px;
+      border:3px solid rgba(255,255,255,0.12);
+      border-top-color:#ff2d55;
+      border-radius:50%;
+      animation:spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
   </style>
 </head>
 <body>
-  <div class="container" id="reelContainer"></div>
 
-  <script>
-    const container = document.getElementById('reelContainer');
+<div class="container" id="reelContainer"></div>
+<div id="toast"></div>
 
-    fetch('videos.json')
-      .then(res => res.json())
-      .then(videos => {
-        if (videos.length === 0) {
-          container.innerHTML = `<h2 style="text-align:center;margin-top:200px;">No videos found</h2>`;
-          return;
-        }
+<script>
+const container = document.getElementById('reelContainer');
+const toast = document.getElementById('toast');
 
-        // Create all reels
-        videos.forEach((videoData, index) => {
-          const reel = document.createElement('div');
-          reel.className = 'reel';
-          reel.id = `reel-${index}`;
+let globalMuted = false;
 
-          const verifiedHTML = videoData.is_verified ? `<span class="verified">✔</span>` : '';
+// ====== Example video (fallback) ======
+const exampleVideo = {
+  post_id: 143392,
+  string_post_id: "cmo6rbwh4008azqow7iarqrp0",
+  title: "পাবেনা কেউ তোমাকে তুমি কারো নও 🤍✨",
+  media_url: "https://hopenity.nikolacdn.com/videos/35408-1776663101747/master.m3u8",
+  name: "No Rules YT",
+  is_verified: true,
+  user_image: "https://hopenity.nikolacdn.com/photos/35408-1775554092204.webp",
+  like_count: 7,
+  view_count: 279,
+  comment_count: 0,
+  music_title: "পাবেনা কেউ তোমাকে তুমি কারো নও"
+};
 
-          reel.innerHTML = `
-            <div class="video-wrapper">
-              <video id="video-${index}" loop playsinline></video>
-              
-              <div class="overlay">
-                <div class="user-info">
-                  <img src="${videoData.user_image || ''}" alt="">
-                  <div>
-                    <span class="username">${videoData.name}</span>
-                    ${verifiedHTML}
-                  </div>
-                </div>
-                <div class="title">${videoData.title}</div>
-                <div class="stats">
-                  ❤️ ${videoData.like_count} &nbsp; 👁️ ${videoData.view_count} &nbsp; 💬 ${videoData.comment_count}
-                </div>
-                ${videoData.music_title ? `<div style="margin-top:8px;opacity:0.85;">🎵 ${videoData.music_title}</div>` : ''}
-              </div>
+// ====== Load videos.json ======
+fetch('videos.json')
+  .then(r => r.json())
+  .then(data => renderVideos(Array.isArray(data) ? data : [data]))
+  .catch(() => {
+    console.warn('videos.json পাওয়া যায়নি — example দেখানো হচ্ছে');
+    renderVideos([exampleVideo]);
+  });
 
-              <button class="sound-btn" id="sound-${index}">🔇</button>
+// ====== Helpers ======
+function fmtNum(n) {
+  n = n || 0;
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+
+function getShareUrl(v) {
+  if (v.string_post_id) return `https://hopenity.com/post/${v.string_post_id}`;
+  if (v.post_id)        return `https://hopenity.com/post/${v.post_id}`;
+  return 'https://hopenity.com';
+}
+
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => toast.classList.remove('show'), 2600);
+}
+
+async function copyLink(url) {
+  try {
+    if (navigator.clipboard) await navigator.clipboard.writeText(url);
+    else {
+      const ta = document.createElement('textarea');
+      ta.value = url; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    showToast('✓  লিংক কপি হয়েছে!');
+  } catch {
+    showToast(url);
+  }
+}
+
+function muteIconSVG(muted) {
+  return muted
+    ? `<svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>`
+    : `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>`;
+}
+
+// ====== Render ======
+function renderVideos(videos) {
+  container.innerHTML = '';
+
+  videos.forEach((vdata, idx) => {
+    const reel = document.createElement('div');
+    reel.className = 'reel';
+    reel.dataset.idx = idx;
+
+    reel.innerHTML = `
+      <div class="video-wrapper">
+        <div class="loading-overlay"><div class="spinner"></div></div>
+
+        <video id="vid-${idx}" loop playsinline></video>
+
+        <!-- Tap area for pause/play -->
+        <div class="tap-area" id="tap-${idx}"></div>
+
+        <!-- Pause/play icon -->
+        <div class="play-pause-icon" id="ppi-${idx}">
+          <svg id="ppi-svg-${idx}" viewBox="0 0 24 24">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+          </svg>
+        </div>
+
+        <!-- Bottom info -->
+        <div class="bottom-info">
+          <div class="user-info">
+            <img src="${vdata.user_image || ''}"
+              onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 42 42%22><rect width=%2242%22 height=%2242%22 fill=%22%23333%22/><text x=%2221%22 y=%2227%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2218%22>${(vdata.name || '?')[0]}</text></svg>'"
+              alt="">
+            <span class="username">${escHtml(vdata.name || 'Unknown')}${vdata.is_verified
+              ? `<span class="verified"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>`
+              : ''}</span>
+          </div>
+          <div class="caption">${escHtml(vdata.title || '')}</div>
+          ${vdata.music_title ? `
+          <div class="music-row">
+            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            <span class="music-text">${escHtml(vdata.music_title)}</span>
+          </div>` : ''}
+        </div>
+
+        <!-- Right actions -->
+        <div class="right-actions">
+          <div class="action-btn like-btn" data-idx="${idx}">
+            <div class="action-circle">
+              <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
             </div>
-          `;
+            <span class="action-label">${fmtNum(vdata.like_count)}</span>
+          </div>
 
-          container.appendChild(reel);
+          <div class="action-btn">
+            <div class="action-circle">
+              <svg viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>
+            </div>
+            <span class="action-label">${fmtNum(vdata.comment_count)}</span>
+          </div>
 
-          const video = document.getElementById(`video-${index}`);
-          const soundBtn = document.getElementById(`sound-${index}`);
+          <div class="action-btn">
+            <div class="action-circle">
+              <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            </div>
+            <span class="action-label">${fmtNum(vdata.view_count)}</span>
+          </div>
 
-          // HLS Setup
-          if (Hls.isSupported()) {
-            const hls = new Hls({ lowLatencyMode: true });
-            hls.loadSource(videoData.media_url);
-            hls.attachMedia(video);
-          } else {
-            video.src = videoData.media_url;
-          }
+          <div class="action-btn share-btn" data-idx="${idx}">
+            <div class="action-circle">
+              <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+            </div>
+            <span class="action-label">শেয়ার</span>
+          </div>
+        </div>
 
-          // Sound Button
-          soundBtn.addEventListener('click', () => {
-            video.muted = !video.muted;
-            soundBtn.textContent = video.muted ? '🔇' : '🔊';
-          });
+        <!-- Mute button -->
+        <div class="mute-btn" id="mute-${idx}">${muteIconSVG(false)}</div>
 
-          // Intersection Observer for auto play + unmute
-          const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-              if (entry.isIntersecting) {
-                video.play().catch(() => {});
-                video.muted = false;
-                soundBtn.textContent = '🔊';
-              } else {
-                video.pause();
-              }
-            });
-          }, { threshold: 0.8 });
+        <!-- Progress bar -->
+        <div class="progress-bar">
+          <div class="progress-fill" id="prog-${idx}"></div>
+        </div>
+      </div>
+    `;
 
-          observer.observe(reel);
-        });
+    container.appendChild(reel);
 
-        // ================== RANDOM START ==================
-        const randomIndex = Math.floor(Math.random() * videos.length);
-        console.log(`🎲 Randomly starting from video index: ${randomIndex}`);
+    // ---- Elements ----
+    const video   = document.getElementById(`vid-${idx}`);
+    const tapArea = document.getElementById(`tap-${idx}`);
+    const ppi     = document.getElementById(`ppi-${idx}`);
+    const ppiSvg  = document.getElementById(`ppi-svg-${idx}`);
+    const prog    = document.getElementById(`prog-${idx}`);
+    const muteBtn = document.getElementById(`mute-${idx}`);
+    const loading = reel.querySelector('.loading-overlay');
 
-        // Scroll to random reel after everything loads
-        setTimeout(() => {
-          const randomReel = document.getElementById(`reel-${randomIndex}`);
-          if (randomReel) {
-            randomReel.scrollIntoView({
-              behavior: "smooth",
-              block: "start"
-            });
-          }
-        }, 800);   // 800ms পর স্ক্রল করবে (ভিডিও লোড হওয়ার জন্য)
+    // ---- HLS Setup ----
+    if (Hls.isSupported()) {
+      const hls = new Hls({ lowLatencyMode: true, enableWorker: false });
+      hls.loadSource(vdata.media_url);
+      hls.attachMedia(video);
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = vdata.media_url;
+    }
 
-      })
-      .catch(err => {
-        console.error(err);
-        container.innerHTML = `<h2 style="text-align:center;margin-top:200px;color:#ff8888;">videos.json লোড করতে সমস্যা হয়েছে</h2>`;
+    video.addEventListener('canplay', () => {
+      if (loading) loading.style.display = 'none';
+    });
+
+    // ---- Progress bar ----
+    video.addEventListener('timeupdate', () => {
+      if (video.duration) {
+        prog.style.width = ((video.currentTime / video.duration) * 100) + '%';
+      }
+    });
+
+    // ---- Tap to pause/play ----
+    let ppiTimer = null;
+    tapArea.addEventListener('click', () => {
+      clearTimeout(ppiTimer);
+      if (video.paused) {
+        video.play().catch(() => {});
+        // Show play icon briefly
+        ppiSvg.innerHTML = `<path d="M8 5v14l11-7z"/>`;
+        ppi.classList.remove('fade-out');
+        ppi.classList.add('pop');
+        ppiTimer = setTimeout(() => {
+          ppi.classList.add('fade-out');
+          setTimeout(() => { ppi.classList.remove('pop','fade-out'); }, 280);
+        }, 600);
+      } else {
+        video.pause();
+        // Show pause icon — stays visible while paused
+        ppiSvg.innerHTML = `<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>`;
+        ppi.classList.remove('fade-out');
+        ppi.classList.add('pop');
+      }
+    });
+
+    // Hide pause icon when video resumes from elsewhere
+    video.addEventListener('play', () => {
+      ppi.classList.remove('pop','fade-out');
+    });
+
+    // ---- Mute toggle ----
+    muteBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      globalMuted = !globalMuted;
+      document.querySelectorAll('video').forEach(v => v.muted = globalMuted);
+      document.querySelectorAll('[id^="mute-"]').forEach(btn => {
+        btn.innerHTML = muteIconSVG(globalMuted);
       });
-  </script>
+    });
+
+    // ---- Share button ----
+    reel.querySelector('.share-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      copyLink(getShareUrl(vdata));
+    });
+
+    // ---- Like animation ----
+    reel.querySelector('.like-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      const circle = e.currentTarget.querySelector('.action-circle');
+      circle.style.background = 'rgba(255,45,85,0.4)';
+      circle.style.transform  = 'scale(1.35)';
+      setTimeout(() => {
+        circle.style.background = '';
+        circle.style.transform  = '';
+      }, 320);
+    });
+
+    // ---- IntersectionObserver: auto play/pause ----
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          video.muted = globalMuted;
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+          video.currentTime = 0;
+          prog.style.width = '0%';
+          ppi.classList.remove('pop', 'fade-out');
+        }
+      });
+    }, { threshold: 0.75 });
+
+    observer.observe(reel);
+  });
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
 </body>
 </html>
