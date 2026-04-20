@@ -72,12 +72,18 @@
 
     /* Bottom Info */
     .bottom-info {
-      position:absolute; bottom:0; left:0; right:70px; z-index:15;
-      padding: 60px 16px 90px 16px;
-      background: linear-gradient(to top, rgba(0,0,0,0.72) 60%, transparent 100%);
+      position:absolute; bottom:72px; left:16px; right:72px; z-index:15;
       pointer-events:none;
     }
     .bottom-info > * { pointer-events:auto; }
+    /* gradient শুধু screen এর নিচে, content এর নিচে পুরো width জুড়ে */
+    .video-wrapper::after {
+      content:'';
+      position:absolute; bottom:0; left:0; right:0;
+      height:35%;
+      background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, transparent 100%);
+      z-index:12; pointer-events:none;
+    }
     .user-info {
       display:flex; align-items:center; gap:10px; margin-bottom:8px;
     }
@@ -123,7 +129,7 @@
 
     /* Right Actions */
     .right-actions {
-      position:absolute; right:12px; bottom:88px;
+      position:absolute; right:12px; bottom:72px;
       display:flex; flex-direction:column; gap:20px; z-index:20;
     }
     .action-btn {
