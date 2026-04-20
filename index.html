@@ -90,13 +90,27 @@
       margin-left:4px; vertical-align:middle;
     }
     .verified svg { width:14px; height:14px; fill:#4fc3f7; }
+    .caption-wrap { margin-bottom:8px; }
     .caption {
       font-size:0.92rem; line-height:1.45;
-      display:-webkit-box; -webkit-line-clamp:2;
-      -webkit-box-orient:vertical; overflow:hidden;
       text-shadow:0 1px 6px rgba(0,0,0,0.8);
-      margin-bottom:8px;
+      white-space:nowrap; overflow:hidden;
+      text-overflow:ellipsis;
+      display:block;
     }
+    .caption.expanded {
+      white-space:normal; overflow:visible;
+      text-overflow:unset;
+      display:-webkit-box; -webkit-line-clamp:999;
+      -webkit-box-orient:vertical;
+    }
+    .caption-toggle {
+      font-size:0.8rem; color:rgba(255,255,255,0.6);
+      cursor:pointer; display:inline-block;
+      margin-top:3px; user-select:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .caption-toggle:hover { color:rgba(255,255,255,0.9); }
     .music-row {
       display:flex; align-items:center; gap:6px;
       font-size:0.78rem; color:rgba(255,255,255,0.65);
@@ -202,10 +216,39 @@ const exampleVideo = {
   music_title: "পাবেনা কেউ তোমাকে তুমি কারো নও"
 };
 
+// ====== Pull-to-refresh (first reel এ up scroll করলে) ======
+let touchStartY = 0;
+let pullActive  = false;
+
+document.addEventListener('touchstart', e => {
+  touchStartY = e.touches[0].clientY;
+  pullActive  = container.scrollTop === 0;
+}, { passive: true });
+
+document.addEventListener('touchend', e => {
+  if (!pullActive) return;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (dy > 60) location.reload();
+}, { passive: true });
+
+// Mouse wheel for desktop: scroll up থেকে when already at top
+let lastWheelTop = 0;
+container.addEventListener('wheel', e => {
+  if (container.scrollTop === 0 && e.deltaY < -40 && lastWheelTop === 0) {
+    location.reload();
+  }
+  lastWheelTop = container.scrollTop;
+}, { passive: true });
+
 // ====== Load videos.json ======
 fetch('videos.json')
   .then(r => r.json())
-  .then(data => renderVideos(Array.isArray(data) ? data : [data]))
+  .then(data => {
+    let arr = Array.isArray(data) ? data : [data];
+    // Shuffle করা — TikTok random feed এর মতো
+    arr = arr.sort(() => Math.random() - 0.5);
+    renderVideos(arr);
+  })
   .catch(() => {
     console.warn('videos.json পাওয়া যায়নি — example দেখানো হচ্ছে');
     renderVideos([exampleVideo]);
@@ -288,7 +331,10 @@ function renderVideos(videos) {
               ? `<span class="verified"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>`
               : ''}</span>
           </div>
-          <div class="caption">${escHtml(vdata.title || '')}</div>
+          <div class="caption-wrap" id="cwrap-${idx}">
+            <span class="caption" id="cap-${idx}">${escHtml(vdata.title || '')}</span>
+            <span class="caption-toggle" id="ctog-${idx}" style="display:none">... আরো</span>
+          </div>
           ${vdata.music_title ? `
           <div class="music-row">
             <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
@@ -404,6 +450,22 @@ function renderVideos(videos) {
       document.querySelectorAll('[id^="mute-"]').forEach(btn => {
         btn.innerHTML = muteIconSVG(globalMuted);
       });
+    });
+
+    // ---- Caption expand/collapse ----
+    const cap  = document.getElementById(`cap-${idx}`);
+    const ctog = document.getElementById(`ctog-${idx}`);
+    const title = vdata.title || '';
+    // Show toggle only if text is long enough to overflow
+    requestAnimationFrame(() => {
+      if (cap.scrollWidth > cap.clientWidth + 2) ctog.style.display = 'inline';
+    });
+    let capExpanded = false;
+    ctog.addEventListener('click', e => {
+      e.stopPropagation();
+      capExpanded = !capExpanded;
+      cap.classList.toggle('expanded', capExpanded);
+      ctog.textContent = capExpanded ? ' কম দেখাও' : '... আরো';
     });
 
     // ---- Share button ----
